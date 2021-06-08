@@ -5,23 +5,17 @@ Metadata:
   QSLint:
     Exclusions: [ W9002, W9003, W9004, W9006 ]
 Parameters:
-  AdministratorEmail:
-    AllowedPattern: ^[a-z0-9]+(\.[_a-z0-9]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,15})$
-    ConstraintDescription: Can contain only ASCII characters. This must be in the
-      format of username@email.com
-    Description: >-
-      Provide an administrator email for Pipeline Manual Approval. SNS subscription
-      Email will be sent to this address for the Manual Approval Stage. This is mandatory
-      for the Manual approval Stage of the CodePipelinee
-    Type: String
   BeanstalkApplicationName:
     Description: Name of the Beanstalk Application where the Blue Environment exists
     Type: String
-  BeanstalkSourceStageBucket:
-    Description: Name of the S3 bucket for the Pipeline Source Stage for ElasticBeanstalk
+  BeanstalkSourceStageGithubConnection:
+    Description: ARN of Github connection used to pull the application sources
     Type: String
-  BeanstalkSourceStageBucketKey:
-    Description: CodePipeline Source Stage Bucket key required for the ElasticBeanstalk
+  BeanstalkSourceStageGithubRepo:
+    Description: The full name of Github repository containing the application code
+    Type: String
+  BeanstalkSourceStageGithubBranch:
+    Description: The name of branch in Github repository containing the application code to deploy
       deployment
     Type: String
   BlueEnvironmentName:
@@ -69,13 +63,14 @@ Resources:
             - ActionTypeId:
                 Category: Source
                 Owner: AWS
-                Provider: S3
+                Provider: CodeStarSourceConnection
                 Version: '1'
               Configuration:
-                PollForSourceChanges: 'true'
-                S3Bucket: !Ref 'BeanstalkSourceStageBucket'
-                S3ObjectKey: !Ref 'BeanstalkSourceStageBucketKey'
-              Name: SourceForElasticBeanstalk
+                ConnectionArn: !Ref 'BeanstalkSourceStageGithubConnection'
+                FullRepositoryId: !Ref 'BeanstalkSourceStageGithubRepo'
+                BranchName: !Ref 'BeanstalkSourceStageGithubBranch'
+                OutputArtifactFormat: CODE_ZIP
+              Name: AppSources
               OutputArtifacts:
                 - Name: ElasticBeanstalkPackage
               RunOrder: 1
@@ -105,7 +100,7 @@ Resources:
               OutputArtifacts:
                 - Name: BlueEnvTestPackage
               RunOrder: 2
-          Name: SourceForElasticBeanstalk
+          Name: Sources
         - Actions:
             - ActionTypeId:
                 Category: Invoke
@@ -130,19 +125,6 @@ Resources:
               Name: LambdaFunctionForNewEnvCreation
               RunOrder: 1
           Name: Lambda
-        - Actions:
-            - ActionTypeId:
-                Category: Approval
-                Owner: AWS
-                Provider: Manual
-                Version: '1'
-              Configuration:
-                NotificationArn: !Ref 'ManualApprovalSNSTopic'
-              InputArtifacts: []
-              Name: manualapp
-              OutputArtifacts: []
-              RunOrder: 1
-          Name: ManualApprovalForUrlSwap
         - Actions:
             - ActionTypeId:
                 Category: Test
@@ -348,12 +330,6 @@ Resources:
             Version: '2012-10-17'
           PolicyName: CodePipelinePutSuccessFailurePolicy
     Type: AWS::IAM::Role
-  ManualApprovalSNSTopic:
-    Properties:
-      Subscription:
-        - Endpoint: !Ref 'AdministratorEmail'
-          Protocol: email
-    Type: AWS::SNS::Topic
   PipelineServiceRole:
     Properties:
       AssumeRolePolicyDocument:
@@ -1198,39 +1174,6 @@ Resources:
                   - s3:RestoreObject
                   - s3:UpdateJobPriority
                   - s3:UpdateJobStatus
-                  - sns:AddPermission
-                  - sns:CheckIfPhoneNumberIsOptedOut
-                  - sns:ConfirmSubscription
-                  - sns:CreatePlatformApplication
-                  - sns:CreatePlatformEndpoint
-                  - sns:CreateTopic
-                  - sns:DeleteEndpoint
-                  - sns:DeletePlatformApplication
-                  - sns:DeleteTopic
-                  - sns:GetEndpointAttributes
-                  - sns:GetPlatformApplicationAttributes
-                  - sns:GetSMSAttributes
-                  - sns:GetSubscriptionAttributes
-                  - sns:GetTopicAttributes
-                  - sns:ListEndpointsByPlatformApplication
-                  - sns:ListPhoneNumbersOptedOut
-                  - sns:ListPlatformApplications
-                  - sns:ListSubscriptions
-                  - sns:ListSubscriptionsByTopic
-                  - sns:ListTagsForResource
-                  - sns:ListTopics
-                  - sns:OptInPhoneNumber
-                  - sns:Publish
-                  - sns:RemovePermission
-                  - sns:SetEndpointAttributes
-                  - sns:SetPlatformApplicationAttributes
-                  - sns:SetSMSAttributes
-                  - sns:SetSubscriptionAttributes
-                  - sns:SetTopicAttributes
-                  - sns:Subscribe
-                  - sns:TagResource
-                  - sns:Unsubscribe
-                  - sns:UntagResource
                   - rds:AddRoleToDBCluster
                   - rds:AddRoleToDBInstance
                   - rds:AddSourceIdentifierToSubscription

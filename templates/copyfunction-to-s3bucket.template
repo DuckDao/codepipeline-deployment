@@ -1,22 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Copy Function template that creates the Asset bucket for Lambda and upload the code. (qs-1rt5l9b00)
 Parameters:
-  BeanstalkSourceStageS3BucketName:
-    Default: ''
-    Description: >-
-      Provide the S3 bucket name where the application package can be uploaded/is
-      uploaded for the CodePipeline Source Stage. If not provided, a bucket will be
-      created. This can be ignored if Git2S3GitToS3integration parameter is set to
-      'true'
-    Type: String
-  GitToS3integration:
-    AllowedValues:
-      - 'true'
-      - 'false'
-    Default: 'false'
-    Description: 'Select ''true'' if you want to have GittoS3 integration setup. If
-      not leave it as default ''false'' '
-    Type: String
   QSS3BucketName:
     AllowedPattern: ^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$
     ConstraintDescription: Quick Start bucket name can include numbers, lowercase
@@ -38,22 +22,7 @@ Parameters:
     Type: String
 Conditions:
   UsingDefaultBucket: !Equals [!Ref QSS3BucketName, 'aws-quickstart']
-  CreateBucketForBeanstalkSource: !And
-    - !Equals
-      - !Ref 'BeanstalkSourceStageS3BucketName'
-      - ''
-    - !Not
-      - !Equals
-        - !Ref 'GitToS3integration'
-        - 'true'
 Resources:
-  BeanstalkSourceBucket:
-    Condition: CreateBucketForBeanstalkSource
-    Properties:
-      Tags: []
-      VersioningConfiguration:
-        Status: Enabled
-    Type: AWS::S3::Bucket
   CodePipelineArtifactStore:
     Properties:
       Tags: []
@@ -200,12 +169,6 @@ Resources:
             Version: '2012-10-17'
           PolicyName: lambda-copier
     Type: AWS::IAM::Role
-  EmptyBeanstalkSourceBucketCleanup:
-    Condition: CreateBucketForBeanstalkSource
-    Properties:
-      DestBucket: !Ref 'BeanstalkSourceBucket'
-      ServiceToken: !GetAtt 'S3CleanUpFunction.Arn'
-    Type: AWS::CloudFormation::CustomResource
   LambdaZipsBucket:
     Properties:
       Tags: []
@@ -335,22 +298,13 @@ Resources:
                   - s3:GetObjectVersion
                   - s3:GetBucketVersioning
                 Effect: Allow
-                Resource: !If
-                  - CreateBucketForBeanstalkSource
-                  - - !Sub 'arn:aws:s3:::${CodePipelineArtifactStore}/*'
-                    - !Sub 'arn:aws:s3:::${CodePipelineArtifactStore}'
-                    - !Sub 'arn:aws:s3:::${BeanstalkSourceBucket}/*'
-                    - !Sub 'arn:aws:s3:::${BeanstalkSourceBucket}'
-                  - - !Sub 'arn:aws:s3:::${CodePipelineArtifactStore}/*'
-                    - !Sub 'arn:aws:s3:::*'
+                Resource:
+                  - !Sub 'arn:aws:s3:::${CodePipelineArtifactStore}/*'
+                  - !Sub 'arn:aws:s3:::*'
             Version: '2012-10-17'
           PolicyName: lambda-copier
     Type: AWS::IAM::Role
 Outputs:
-  BeanstalkSourceBucket:
-    Condition: CreateBucketForBeanstalkSource
-    Description: S3 Bucket for the CodePipeline Source Stage for Beanstalk
-    Value: !Ref 'BeanstalkSourceBucket'
   CodePipelineArtifactStore:
     Description: S3 Bucket for the CodePipeline Artifcat
     Value: !Ref 'CodePipelineArtifactStore'
